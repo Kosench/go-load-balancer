@@ -5,6 +5,8 @@ import (
 	"load-balancer/internal/config"
 	"load-balancer/pkg/utils"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 )
 
 type Server struct {
@@ -37,4 +39,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No available backends", http.StatusServiceUnavailable)
 		return
 	}
+
+	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: upstream})
+	proxy.ServeHTTP(w, r)
 }
