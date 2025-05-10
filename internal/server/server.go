@@ -15,11 +15,11 @@ type Server struct {
 	Logger   *utils.Logger
 }
 
-func NewServer(cfg *config.Config) *Server {
+func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	logger := utils.NewLogger(cfg.LogLevel)
 	return &Server{
 		Config:   cfg,
-		Balancer: balancer.NewBalancer(cfg.Backends),
+		Balancer: lb,
 		Logger:   logger,
 	}
 }
