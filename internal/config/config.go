@@ -1,10 +1,14 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"github.com/spf13/viper"
+	"strings"
+)
 
 type Config struct {
 	ListenAddress string   `mapstructure:"ListenAddress"`
 	Backends      []string `mapstructure:"UPSTREAMS"`
+	LogLevel      string   `mapstructure:"LOG_LEVEL"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -21,6 +25,10 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	err = viper.Unmarshal(&cfg)
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.Backends = strings.Split(viper.GetString("BACKENDS"), ",")
 	return &cfg, nil
 }
