@@ -8,7 +8,6 @@ import (
 type Config struct {
 	ListenAddress string   `mapstructure:"ListenAddress"`
 	Backends      []string `mapstructure:"UPSTREAMS"`
-	LogLevel      string   `mapstructure:"LOG_LEVEL"`
 }
 
 func LoadConfig(path string) (*Config, error) {
