@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/rs/zerolog/log"
+	"load-balancer/internal/backend"
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/config"
 	"load-balancer/internal/server"
@@ -12,6 +13,8 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load config")
 	}
+
+	backend.StartBackend(cfg)
 
 	strategy := balancer.NewRoundRobinStrategy(cfg.Backends)
 
