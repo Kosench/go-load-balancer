@@ -3,7 +3,7 @@ package backend
 import (
 	"fmt"
 	"github.com/rs/zerolog/log"
-	"load-balancer/internal/config"
+
 	"net/http"
 )
 
@@ -12,12 +12,15 @@ type Backend struct {
 	Alive bool
 }
 
-func StartBackend(cfg *config.Config) {
-	for _, backend := range cfg.Backends {
+func StartBackend(backends []*Backend) {
+	for _, backend := range backends {
 		go func(addr string) {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "Response from backend %s", addr)
+			})
+			mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
 			})
 
 			log.Info().Str("address", addr).Msg("Starting backend server")
@@ -28,7 +31,7 @@ func StartBackend(cfg *config.Config) {
 					Msg("Failed to start backend server on")
 			}
 
-		}(backend)
+		}(backend.Addr)
 	}
 
 	return

@@ -5,7 +5,9 @@ import (
 	"load-balancer/internal/backend"
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/config"
+	"load-balancer/internal/health"
 	"load-balancer/internal/server"
+	"time"
 )
 
 func main() {
@@ -13,12 +15,23 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load config")
 	}
+	log.Print(cfg)
 
-	backend.StartBackend(cfg)
+	var backends []*backend.Backend
+	for _, addr := range cfg.Backends {
+		backends = append(backends, &backend.Backend{
+			Addr:  addr,
+			Alive: true,
+		})
+	}
 
-	strategy := balancer.NewRoundRobinStrategy(cfg.Backends)
+	backend.StartBackend(backends)
 
-	lb := balancer.NewBalancer(strategy)
+	strategy := balancer.NewRoundRobinStrategy(backends)
+	lb := balancer.NewBalancer(strategy, backends)
+
+	time.Sleep(2 * time.Second)
+	health.StartHealthCheck(backends, 5*time.Second)
 
 	srv := server.NewServer(cfg, lb)
 	if err := srv.Start(); err != nil {
