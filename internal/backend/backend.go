@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+type Backend struct {
+	Addr  string
+	Alive bool
+}
+
 func StartBackend(cfg *config.Config) {
 	for _, backend := range cfg.Backends {
 		go func(addr string) {
@@ -15,7 +20,7 @@ func StartBackend(cfg *config.Config) {
 				fmt.Fprintf(w, "Response from backend %s", addr)
 			})
 
-			log.Printf("Starting backend server on %s", addr)
+			log.Info().Str("address", addr).Msg("Starting backend server")
 			if err := http.ListenAndServe(addr, mux); err != nil {
 				log.Fatal().
 					Err(err).
