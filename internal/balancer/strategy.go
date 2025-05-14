@@ -15,15 +15,7 @@ type RoundRobinStrategy struct {
 	mutex    sync.Mutex
 }
 
-func NewRoundRobinStrategy(addresses []string) *RoundRobinStrategy {
-	backends := make([]*backend.Backend, len(addresses))
-	for i, addr := range addresses {
-		backends[i] = &backend.Backend{
-			Addr:  addr,
-			Alive: true,
-		}
-	}
-
+func NewRoundRobinStrategy(backends []*backend.Backend) *RoundRobinStrategy {
 	return &RoundRobinStrategy{
 		backends: backends,
 	}
