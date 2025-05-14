@@ -6,8 +6,8 @@ import (
 )
 
 type Config struct {
-	ListenAddress string   `mapstructure:"ListenAddress"`
-	Backends      []string `mapstructure:"UPSTREAMS"`
+	ListenAddress string
+	Backends      []string
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -17,17 +17,19 @@ func LoadConfig(path string) (*Config, error) {
 
 	viper.AutomaticEnv()
 
-	var cfg Config
+	viper.SetDefault("ListenAddress", ":8080")
+	viper.SetDefault("BACKENDS", []string{"localhost:9001", "localhost:9002"})
 
-	err := viper.ReadInConfig()
-	if err != nil {
+	viper.BindEnv("BACKENDS")
+
+	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
 	}
 
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, err
+	cfg := &Config{
+		ListenAddress: viper.GetString("ListenAddress"),
+		Backends:      strings.Split(viper.GetString("BACKENDS"), ","),
 	}
 
-	cfg.Backends = strings.Split(viper.GetString("BACKENDS"), ",")
-	return &cfg, nil
+	return cfg, nil
 }
