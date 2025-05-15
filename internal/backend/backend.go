@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"time"
 
 	"net/http"
 )
@@ -12,7 +14,7 @@ type Backend struct {
 	Alive bool
 }
 
-func StartBackend(backends []*Backend) {
+func StartBackend(ctx context.Context, backends []*Backend) {
 	for _, backend := range backends {
 		go func(addr string) {
 			mux := http.NewServeMux()
@@ -23,14 +25,33 @@ func StartBackend(backends []*Backend) {
 				w.WriteHeader(http.StatusOK)
 			})
 
-			log.Info().Str("address", addr).Msg("Starting backend server")
-			if err := http.ListenAndServe(addr, mux); err != nil {
-				log.Fatal().
-					Err(err).
-					Str("address", addr).
-					Msg("Failed to start backend server on")
+			srv := &http.Server{
+				Addr:    addr,
+				Handler: mux,
 			}
 
+			go func() {
+				log.Info().Str("addres", addr).Msg("Starting backend server")
+				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Error().
+						Err(err).
+						Str("address", addr).
+						Msg("Failed to start backend server")
+				}
+			}()
+
+			<-ctx.Done()
+			log.Info().Str("address", addr).Msg("Shutting down backend server")
+
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := srv.Shutdown(shutdownCtx); err != nil {
+				log.Error().
+					Err(err).
+					Str("address", addr).
+					Msg("Backend server shutdown failed")
+			}
+			log.Info().Str("address", addr).Msg("Backend server stopped")
 		}(backend.Addr)
 	}
 

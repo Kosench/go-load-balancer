@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"github.com/rs/zerolog/log"
 	"load-balancer/internal/backend"
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/config"
 	"load-balancer/internal/health"
 	"load-balancer/internal/server"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -25,7 +29,10 @@ func main() {
 		})
 	}
 
-	backend.StartBackend(backends)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	backend.StartBackend(ctx, backends)
 
 	strategy := balancer.NewRoundRobinStrategy(backends)
 	lb := balancer.NewBalancer(strategy, backends)
@@ -34,8 +41,24 @@ func main() {
 	health.StartHealthCheck(backends, 5*time.Second)
 
 	srv := server.NewServer(cfg, lb)
-	if err := srv.Start(); err != nil {
-		log.Fatal().Err(err).Msg("Server failed")
+	go func() {
+		if err := srv.Start(); err != nil && err != context.Canceled {
+			log.Fatal().Err(err).Msg("Server failed")
+		}
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	<-sigChan
+	log.Info().Msg("Received shutdown signal, initiating graceful shutdown")
+
+	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("Server shutdown failed")
 	}
 
+	log.Info().Msg("Server and backends stopped")
 }
