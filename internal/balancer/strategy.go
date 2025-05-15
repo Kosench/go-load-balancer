@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	"github.com/rs/zerolog/log"
 	"load-balancer/internal/backend"
 	"sync"
 )
@@ -29,8 +30,13 @@ func (r *RoundRobinStrategy) GetNext() string {
 	for i := 0; i < n; i++ {
 		r.index = (r.index + 1) % n
 		if r.backends[r.index].Alive {
+			log.Debug().
+				Str("selected_backend", r.backends[r.index].Addr).
+				Msg("Selected backend for request")
 			return r.backends[r.index].Addr
 		}
 	}
+
+	log.Warn().Msg("No available backends found")
 	return ""
 }
