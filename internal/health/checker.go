@@ -21,9 +21,9 @@ func StartHealthCheck(backends []*backend.Backend, interval time.Duration) {
 func checkBackend(b *backend.Backend) {
 	resp, err := http.Get("http://" + b.Addr + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
-		b.Alive = false
+		b.SetAlive(false)
 	} else {
-		b.Alive = true
+		b.SetAlive(true)
 	}
 	if resp != nil {
 		resp.Body.Close()
@@ -31,6 +31,6 @@ func checkBackend(b *backend.Backend) {
 
 	log.Info().
 		Str("backend", b.Addr).
-		Bool("alive", b.Alive).
+		Bool("alive", b.IsAlive()).
 		Msg("Backend health status updated")
 }

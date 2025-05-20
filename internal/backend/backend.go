@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"sync/atomic"
 	"time"
 
 	"net/http"
@@ -11,7 +12,19 @@ import (
 
 type Backend struct {
 	Addr  string
-	Alive bool
+	alive int32
+}
+
+func (b *Backend) IsAlive() bool {
+	return atomic.LoadInt32(&b.alive) == 1
+}
+
+func (b *Backend) SetAlive(state bool) {
+	var value int32
+	if state {
+		value = 1
+	}
+	atomic.StoreInt32(&b.alive, value)
 }
 
 func StartBackend(ctx context.Context, backends []*Backend) {
