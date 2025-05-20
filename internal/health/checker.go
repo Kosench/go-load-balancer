@@ -29,6 +29,7 @@ func checkBackend(b *backend.Backend) {
 		resp.Body.Close()
 	}
 
+	// Log the health status
 	log.Info().
 		Str("backend", b.Addr).
 		Bool("alive", b.IsAlive()).

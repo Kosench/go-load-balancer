@@ -29,7 +29,7 @@ func (r *RoundRobinStrategy) GetNext() string {
 	n := len(r.backends)
 	for i := 0; i < n; i++ {
 		r.index = (r.index + 1) % n
-		if r.backends[r.index].Alive {
+		if r.backends[r.index].IsAlive() {
 			log.Debug().
 				Str("selected_backend", r.backends[r.index].Addr).
 				Msg("Selected backend for request")
