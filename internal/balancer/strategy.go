@@ -26,17 +26,22 @@ func (r *RoundRobinStrategy) GetNext() string {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	n := len(r.backends)
-	for i := 0; i < n; i++ {
-		r.index = (r.index + 1) % n
-		if r.backends[r.index].IsAlive() {
-			log.Debug().
-				Str("selected_backend", r.backends[r.index].Addr).
-				Msg("Selected backend for request")
-			return r.backends[r.index].Addr
+	aliveBackends := make([]*backend.Backend, 0, len(r.backends))
+	for _, b := range r.backends {
+		if b.IsAlive() {
+			aliveBackends = append(aliveBackends, b)
 		}
 	}
 
-	log.Warn().Msg("No available backends found")
-	return ""
+	if len(aliveBackends) == 0 {
+		log.Warn().Msg("No available backends found")
+		return ""
+	}
+
+	r.index = (r.index + 1) % len(aliveBackends)
+	selected := aliveBackends[r.index]
+	log.Debug().
+		Str("selected_backend", selected.Addr).
+		Msg("Selected backend for request")
+	return selected.Addr
 }
