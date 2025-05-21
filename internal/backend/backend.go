@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,13 +28,9 @@ func (b *Backend) SetAlive(state bool) {
 }
 
 func StartBackend(ctx context.Context, backends []*Backend) {
-	var wg sync.WaitGroup
 	for _, b := range backends {
-		wg.Add(1)
-
+		b.SetAlive(true)
 		go func(b *Backend) {
-			defer wg.Done()
-
 			mux := http.NewServeMux()
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "Response from backend %s", b.Addr)
@@ -50,7 +45,7 @@ func StartBackend(ctx context.Context, backends []*Backend) {
 			}
 
 			go func() {
-				log.Info().Str("addres", b.Addr).Msg("Starting backend server")
+				log.Info().Str("address", b.Addr).Msg("Starting backend server")
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					log.Error().
 						Err(err).
@@ -73,6 +68,4 @@ func StartBackend(ctx context.Context, backends []*Backend) {
 			log.Info().Str("address", b.Addr).Msg("Backend server stopped")
 		}(b)
 	}
-
-	wg.Wait()
 }
