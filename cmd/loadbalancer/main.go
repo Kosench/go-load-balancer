@@ -24,8 +24,7 @@ func main() {
 	var backends []*backend.Backend
 	for _, addr := range cfg.Backends {
 		backends = append(backends, &backend.Backend{
-			Addr:  addr,
-			Alive: true,
+			Addr: addr,
 		})
 	}
 
@@ -38,7 +37,7 @@ func main() {
 	lb := balancer.NewBalancer(strategy, backends)
 
 	time.Sleep(2 * time.Second)
-	health.StartHealthCheck(backends, 5*time.Second)
+	health.StartHealthCheck(backends, 15*time.Second)
 
 	srv := server.NewServer(cfg, lb)
 	go func() {
