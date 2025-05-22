@@ -5,6 +5,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/config"
+	"load-balancer/internal/ratelimit"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -13,11 +15,12 @@ import (
 )
 
 type Server struct {
-	Config    *config.Config
-	Balancer  *balancer.Balancer
-	srv       *http.Server
-	proxies   map[string]*httputil.ReverseProxy
-	proxiesMu sync.RWMutex
+	Config      *config.Config
+	Balancer    *balancer.Balancer
+	RateLimiter ratelimit.RateLimiter
+	srv         *http.Server
+	proxies     map[string]*httputil.ReverseProxy
+	proxiesMu   sync.RWMutex
 }
 
 func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
@@ -39,7 +42,11 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	server := &Server{
 		Config:   cfg,
 		Balancer: lb,
-		proxies:  proxies,
+		RateLimiter: ratelimit.NewRateLimiter(ratelimit.Config{
+			Capacity:   cfg.RateLimitCapacity,
+			RefillRate: cfg.RateLimitRefillRate,
+		}),
+		proxies: proxies,
 	}
 
 	server.srv = &http.Server{
@@ -55,6 +62,7 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 
 func (s *Server) Start() error {
 	log.Info().Msgf("Starting server on %s", s.Config.ListenAddress)
+	s.RateLimiter.Start(context.Background())
 	return s.srv.ListenAndServe()
 }
 
@@ -64,6 +72,22 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		log.Error().Err(err).Str("remote_addr", r.RemoteAddr).Msg("Failed to parse client IP")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	clientID := host // Используем только IP как идентификатор клиента
+
+	if !s.RateLimiter.Allow(clientID) {
+		log.Error().
+			Str("client", clientID).
+			Msg("Request rate limited")
+		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+		return
+	}
+
 	log.Debug().
 		Str("method", r.Method).
 		Stringer("url", r.URL).

@@ -5,8 +5,10 @@ import (
 )
 
 type Config struct {
-	ListenAddress string   `mapstructure:"ListenAddress"`
-	Backends      []string `mapstructure:"Backends"`
+	ListenAddress       string   `mapstructure:"ListenAddress"`
+	Backends            []string `mapstructure:"Backends"`
+	RateLimitCapacity   float64  `mapstructure:"RateLimitCapacity"`
+	RateLimitRefillRate float64  `mapstructure:"RateLimitRefillRate"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -18,6 +20,8 @@ func LoadConfig(path string) (*Config, error) {
 
 	viper.SetDefault("ListenAddress", ":8080")
 	viper.SetDefault("BACKENDS", []string{"localhost:9001", "localhost:9002"})
+	viper.SetDefault("RateLimitCapacity", 5.0)
+	viper.SetDefault("RateLimitRefillRate", 1.0)
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
