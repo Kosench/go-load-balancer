@@ -25,7 +25,10 @@ func StartHealthCheck(ctx context.Context, backends []*backend.Backend, interval
 }
 
 func checkBackend(b *backend.Backend) {
-	resp, err := http.Get("http://" + b.Addr + "/health")
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Get("http://" + b.Addr + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
 		b.SetAlive(false)
 	} else {
