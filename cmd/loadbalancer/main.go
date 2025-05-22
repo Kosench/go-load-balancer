@@ -37,7 +37,7 @@ func main() {
 	lb := balancer.NewBalancer(strategy, backends)
 
 	time.Sleep(2 * time.Second)
-	health.StartHealthCheck(backends, 15*time.Second)
+	health.StartHealthCheck(ctx, backends, 15*time.Second)
 
 	srv := server.NewServer(cfg, lb)
 	go func() {

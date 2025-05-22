@@ -1,19 +1,25 @@
 package health
 
 import (
+	"context"
 	"github.com/rs/zerolog/log"
 	"load-balancer/internal/backend"
 	"net/http"
 	"time"
 )
 
-func StartHealthCheck(backends []*backend.Backend, interval time.Duration) {
+func StartHealthCheck(ctx context.Context, backends []*backend.Backend, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
 	go func() {
-		for {
+		select {
+		case <-ctx.Done():
+			log.Info().Msg("Stopping health checks")
+		case <-ticker.C:
 			for _, b := range backends {
 				go checkBackend(b)
 			}
-			time.Sleep(interval)
 		}
 	}()
 }
