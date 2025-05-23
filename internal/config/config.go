@@ -7,8 +7,8 @@ import (
 type Config struct {
 	ListenAddress       string   `mapstructure:"ListenAddress"`
 	Backends            []string `mapstructure:"Backends"`
-	RateLimitCapacity   float64  `mapstructure:"RateLimitCapacity"`
-	RateLimitRefillRate float64  `mapstructure:"RateLimitRefillRate"`
+	RateLimitCapacity   int      `mapstructure:"RateLimitCapacity"`
+	RateLimitRefillRate int      `mapstructure:"RateLimitRefillRate"`
 }
 
 func LoadConfig(path string) (*Config, error) {

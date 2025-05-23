@@ -13,14 +13,14 @@ type RateLimiter interface {
 }
 
 type Config struct {
-	Capacity   float64
-	RefillRate float64
+	Capacity   int
+	RefillRate int
 }
 
 type TokenBucket struct {
-	capacity    float64
-	refillRate  float64
-	tokens      float64
+	capacity    int
+	refillRate  int
+	tokens      int
 	lastUpdated time.Time
 	mu          sync.Mutex
 }
@@ -54,12 +54,12 @@ func (rl *RateLimiterImpl) Start(ctx context.Context) {
 					bucket.mu.Lock()
 					elapsed := t.Sub(bucket.lastUpdated).Seconds()
 					oldTokens := bucket.tokens
-					bucket.tokens = min(bucket.capacity, bucket.tokens+elapsed*bucket.refillRate)
+					bucket.tokens = min(bucket.capacity, bucket.tokens+int(elapsed)*bucket.refillRate)
 					bucket.lastUpdated = t
 					if bucket.tokens > oldTokens {
 						log.Trace().
 							Str("client", clientID).
-							Float64("tokens", bucket.tokens).
+							Int("tokens", bucket.tokens).
 							Msg("Tokens refilled")
 					}
 					bucket.mu.Unlock()
@@ -89,7 +89,7 @@ func (rl *RateLimiterImpl) Allow(clientID string) bool {
 
 	// Пополняем токены на основе времени
 	elapsed := time.Since(bucket.lastUpdated).Seconds()
-	bucket.tokens = min(bucket.capacity, bucket.tokens+elapsed*bucket.refillRate)
+	bucket.tokens = min(bucket.capacity, bucket.tokens+int(elapsed)*bucket.refillRate)
 	bucket.lastUpdated = time.Now()
 
 	// Проверяем наличие токена
@@ -100,7 +100,7 @@ func (rl *RateLimiterImpl) Allow(clientID string) bool {
 	return false
 }
 
-func minFloat(a, b float64) float64 {
+func minFloat(a, b int) int {
 	if a < b {
 		return a
 	}
