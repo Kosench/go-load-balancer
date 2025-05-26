@@ -13,12 +13,14 @@ func StartHealthCheck(ctx context.Context, backends []*backend.Backend, interval
 	defer ticker.Stop()
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			log.Info().Msg("Stopping health checks")
-		case <-ticker.C:
-			for _, b := range backends {
-				go checkBackend(b)
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info().Msg("Stopping health checks")
+			case <-ticker.C:
+				for _, b := range backends {
+					go checkBackend(b)
+				}
 			}
 		}
 	}()
