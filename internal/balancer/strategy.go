@@ -38,10 +38,13 @@ func (r *RoundRobinStrategy) GetNext() string {
 		return ""
 	}
 
-	r.index = (r.index + 1) % len(aliveBackends)
 	selected := aliveBackends[r.index]
+
+	r.index = (r.index + 1) % len(aliveBackends)
+
 	log.Debug().
 		Str("selected_backend", selected.Addr).
 		Msg("Selected backend for request")
+
 	return selected.Addr
 }
