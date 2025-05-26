@@ -12,11 +12,11 @@ import (
 
 type Backend struct {
 	Addr  string
-	alive int32
+	Alive int32
 }
 
 func (b *Backend) IsAlive() bool {
-	return atomic.LoadInt32(&b.alive) == 1
+	return atomic.LoadInt32(&b.Alive) == 1
 }
 
 func (b *Backend) SetAlive(state bool) {
@@ -24,7 +24,7 @@ func (b *Backend) SetAlive(state bool) {
 	if state {
 		value = 1
 	}
-	atomic.StoreInt32(&b.alive, value)
+	atomic.StoreInt32(&b.Alive, value)
 }
 
 func StartBackend(ctx context.Context, backends []*Backend) {
