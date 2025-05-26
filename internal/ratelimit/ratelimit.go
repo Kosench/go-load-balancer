@@ -20,7 +20,7 @@ type Config struct {
 type TokenBucket struct {
 	capacity    int
 	refillRate  int
-	tokens      int
+	tokens      float64
 	lastUpdated time.Time
 	mu          sync.Mutex
 }
@@ -54,12 +54,12 @@ func (rl *RateLimiterImpl) Start(ctx context.Context) {
 					bucket.mu.Lock()
 					elapsed := t.Sub(bucket.lastUpdated).Seconds()
 					oldTokens := bucket.tokens
-					bucket.tokens = min(bucket.capacity, bucket.tokens+int(elapsed)*bucket.refillRate)
+					bucket.tokens = min(bucket.capacity, bucket.tokens+elapsed*float64(bucket.refillRate))
 					bucket.lastUpdated = t
 					if bucket.tokens > oldTokens {
 						log.Trace().
 							Str("client", clientID).
-							Int("tokens", bucket.tokens).
+							Float64("tokens", bucket.tokens).
 							Msg("Tokens refilled")
 					}
 					bucket.mu.Unlock()
@@ -77,7 +77,7 @@ func (rl *RateLimiterImpl) Allow(clientID string) bool {
 		bucket = &TokenBucket{
 			capacity:    rl.config.Capacity,
 			refillRate:  rl.config.RefillRate,
-			tokens:      rl.config.Capacity,
+			tokens:      float64(rl.config.Capacity),
 			lastUpdated: time.Now(),
 		}
 		rl.buckets[clientID] = bucket
@@ -89,7 +89,7 @@ func (rl *RateLimiterImpl) Allow(clientID string) bool {
 
 	// Пополняем токены на основе времени
 	elapsed := time.Since(bucket.lastUpdated).Seconds()
-	bucket.tokens = min(bucket.capacity, bucket.tokens+int(elapsed)*bucket.refillRate)
+	bucket.tokens = min(bucket.capacity, bucket.tokens+elapsed*float64(bucket.refillRate))
 	bucket.lastUpdated = time.Now()
 
 	// Проверяем наличие токена
@@ -100,9 +100,9 @@ func (rl *RateLimiterImpl) Allow(clientID string) bool {
 	return false
 }
 
-func minFloat(a, b int) int {
-	if a < b {
-		return a
+func min(a int, b float64) float64 {
+	if float64(a) < b {
+		return float64(a)
 	}
 	return b
 }
