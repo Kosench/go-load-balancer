@@ -20,8 +20,8 @@ func LoadConfig(path string) (*Config, error) {
 
 	viper.SetDefault("ListenAddress", ":8080")
 	viper.SetDefault("BACKENDS", []string{"localhost:9001", "localhost:9002"})
-	viper.SetDefault("RateLimitCapacity", 5.0)
-	viper.SetDefault("RateLimitRefillRate", 1.0)
+	viper.SetDefault("RATE_LIMIT_CAPACITY", 5.0)
+	viper.SetDefault("RATE_LIMIT_REFILL_RATE", 1.0)
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err

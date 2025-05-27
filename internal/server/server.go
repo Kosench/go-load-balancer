@@ -42,7 +42,7 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	server := &Server{
 		Config:   cfg,
 		Balancer: lb,
-		RateLimiter: ratelimit.NewRateLimiter(ratelimit.Config{
+		RateLimiter: ratelimit.NewTokenBucketRateLimiter(ratelimit.RateLimiterConfig{
 			Capacity:   cfg.RateLimitCapacity,
 			RefillRate: cfg.RateLimitRefillRate,
 		}),
@@ -62,7 +62,6 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 
 func (s *Server) Start() error {
 	log.Info().Msgf("Starting server on %s", s.Config.ListenAddress)
-	s.RateLimiter.Start(context.Background())
 	return s.srv.ListenAndServe()
 }
 
