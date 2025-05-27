@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,10 +28,12 @@ func (b *Backend) SetAlive(state bool) {
 	atomic.StoreInt32(&b.Alive, value)
 }
 
-func StartBackend(ctx context.Context, backends []*Backend) {
+func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup) {
 	for _, b := range backends {
 		b.SetAlive(true)
+		wg.Add(1)
 		go func(b *Backend) {
+			defer wg.Done()
 			mux := http.NewServeMux()
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "Response from backend %s", b.Addr)
@@ -44,6 +47,7 @@ func StartBackend(ctx context.Context, backends []*Backend) {
 				Handler: mux,
 			}
 
+			serverDone := make(chan struct{})
 			go func() {
 				log.Info().Str("address", b.Addr).Msg("Starting backend server")
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -52,20 +56,25 @@ func StartBackend(ctx context.Context, backends []*Backend) {
 						Str("address", b.Addr).
 						Msg("Failed to start backend server")
 				}
+				close(serverDone)
 			}()
 
-			<-ctx.Done()
-			log.Info().Str("address", b.Addr).Msg("Shutting down backend server")
-
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := srv.Shutdown(shutdownCtx); err != nil {
-				log.Error().
-					Err(err).
-					Str("address", b.Addr).
-					Msg("Backend server shutdown failed")
+			select {
+			case <-ctx.Done():
+				log.Info().Str("address", b.Addr).Msg("Shutting down backend server")
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := srv.Shutdown(shutdownCtx); err != nil {
+					log.Error().
+						Err(err).
+						Str("address", b.Addr).
+						Msg("Backend server shutdown failed")
+				}
+				log.Info().Str("address", b.Addr).Msg("Backend server stopped")
+				<-serverDone // Ждем завершения ListenAndServe
+			case <-serverDone:
+				// Сервер сам завершился
 			}
-			log.Info().Str("address", b.Addr).Msg("Backend server stopped")
 		}(b)
 	}
 }

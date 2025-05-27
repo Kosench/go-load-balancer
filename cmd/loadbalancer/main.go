@@ -10,6 +10,7 @@ import (
 	"load-balancer/internal/server"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -31,7 +32,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	backend.StartBackend(ctx, backends)
+	var wg sync.WaitGroup
+	backend.StartBackend(ctx, backends, &wg)
 
 	strategy := balancer.NewRoundRobinStrategy(backends)
 	lb := balancer.NewBalancer(strategy, backends)
