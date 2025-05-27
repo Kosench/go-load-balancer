@@ -17,6 +17,7 @@ func StartHealthCheck(ctx context.Context, backends []*backend.Backend, interval
 			select {
 			case <-ctx.Done():
 				log.Info().Msg("Stopping health checks")
+				return
 			case <-ticker.C:
 				for _, b := range backends {
 					go checkBackend(b)
