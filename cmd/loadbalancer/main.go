@@ -61,5 +61,7 @@ func main() {
 		log.Error().Err(err).Msg("Server shutdown failed")
 	}
 
+	wg.Wait()
+
 	log.Info().Msg("Server and backends stopped")
 }

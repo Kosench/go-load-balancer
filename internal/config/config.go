@@ -5,10 +5,10 @@ import (
 )
 
 type Config struct {
-	ListenAddress       string   `mapstructure:"ListenAddress"`
-	Backends            []string `mapstructure:"Backends"`
-	RateLimitCapacity   int      `mapstructure:"RateLimitCapacity"`
-	RateLimitRefillRate int      `mapstructure:"RateLimitRefillRate"`
+	ListenAddress       string   `mapstructure:"LISTEN_ADDRESS"`
+	Backends            []string `mapstructure:"BACKENDS"`
+	RateLimitCapacity   float64  `mapstructure:"RATE_LIMIT_CAPACITY"`
+	RateLimitRefillRate float64  `mapstructure:"RATE_LIMIT_REFILL_RATE"`
 }
 
 func LoadConfig(path string) (*Config, error) {
