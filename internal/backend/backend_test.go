@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -23,9 +24,9 @@ func TestBackend_IsAlive(t *testing.T) {
 func TestStartBackend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	var wg sync.WaitGroup
 	backend := &Backend{Addr: "localhost:9999"}
-	StartBackend(ctx, []*Backend{backend})
+	StartBackend(ctx, []*Backend{backend}, &wg)
 
 	// Allow time for the server to start
 	time.Sleep(100 * time.Millisecond)

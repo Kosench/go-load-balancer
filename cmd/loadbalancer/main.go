@@ -8,6 +8,7 @@ import (
 	"load-balancer/internal/config"
 	"load-balancer/internal/health"
 	"load-balancer/internal/server"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -43,7 +44,8 @@ func main() {
 
 	srv := server.NewServer(cfg, lb)
 	go func() {
-		if err := srv.Start(); err != nil && err != context.Canceled {
+		err := srv.Start()
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("Server failed")
 		}
 	}()
