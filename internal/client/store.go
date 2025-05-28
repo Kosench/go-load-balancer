@@ -37,3 +37,45 @@ func (s *InMemoryClientStore) Create(client *Client) error {
 	s.clients[client.ID] = client
 	return nil
 }
+
+func (s *InMemoryClientStore) Get(clientID string) (*Client, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c, exist := s.clients[clientID]
+	if !exist {
+		return nil, errors.New("client not found")
+	}
+	return c, nil
+}
+
+func (s *InMemoryClientStore) Update(client *Client) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, exists := s.clients[client.ID]
+	if !exists {
+		return errors.New("client not found")
+	}
+	s.clients[client.ID] = client
+	return nil
+}
+
+func (s *InMemoryClientStore) Delete(clientID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, exist := s.clients[clientID]
+	if !exist {
+		return errors.New("client not found")
+	}
+	delete(s.clients, clientID)
+	return nil
+}
+
+func (s *InMemoryClientStore) List() ([]*Client, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]*Client, 0, len(s.clients))
+	for _, c := range s.clients {
+		result = append(result, c)
+	}
+	return result, nil
+}
