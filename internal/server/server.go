@@ -4,23 +4,26 @@ import (
 	"context"
 	"github.com/rs/zerolog/log"
 	"load-balancer/internal/balancer"
+	"load-balancer/internal/client"
 	"load-balancer/internal/config"
 	"load-balancer/internal/ratelimit"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
 
 type Server struct {
-	Config      *config.Config
-	Balancer    *balancer.Balancer
-	RateLimiter ratelimit.RateLimiter
-	srv         *http.Server
-	proxies     map[string]*httputil.ReverseProxy
-	proxiesMu   sync.RWMutex
+	Config        *config.Config
+	Balancer      *balancer.Balancer
+	RateLimiter   ratelimit.RateLimiter
+	srv           *http.Server
+	proxies       map[string]*httputil.ReverseProxy
+	proxiesMu     sync.RWMutex
+	clientHandler *client.Handler
 }
 
 func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
@@ -39,6 +42,12 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 		}
 		proxies[backend.Addr] = proxy
 	}
+
+	clientStore := client.NewInMemoryClientStore()
+	clientHandler := client.NewHandler(clientStore)
+	clientMux := http.NewServeMux()
+	clientHandler.RegisterRouter(clientMux)
+
 	server := &Server{
 		Config:   cfg,
 		Balancer: lb,
@@ -46,12 +55,19 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 			Capacity:   cfg.RateLimitCapacity,
 			RefillRate: cfg.RateLimitRefillRate,
 		}),
-		proxies: proxies,
+		proxies:       proxies,
+		clientHandler: clientHandler,
 	}
 
 	server.srv = &http.Server{
-		Addr:              cfg.ListenAddress,
-		Handler:           http.HandlerFunc(server.handleRequest),
+		Addr: cfg.ListenAddress,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/clients") {
+				clientMux.ServeHTTP(w, r)
+				return
+			}
+			server.handleRequest(w, r)
+		}),
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,

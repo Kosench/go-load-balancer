@@ -16,8 +16,8 @@ func NewHandler(store ClientStore) *Handler {
 }
 
 func (h *Handler) RegisterRouter(mux *http.ServeMux) {
-	mux.HandleFunc("/client", h.handleClients)
-	mux.HandleFunc("/client/", h.handleClientByID)
+	mux.HandleFunc("/clients", h.handleClients)
+	mux.HandleFunc("/clients/", h.handleClientByID)
 }
 
 func (h *Handler) handleClients(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +25,7 @@ func (h *Handler) handleClients(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		h.createClient(w, r)
 	case http.MethodGet:
-		h.listClient(w, r)
+		h.listClients(w, r)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
@@ -67,16 +67,18 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.Store.Create(&c); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
+		return
 	}
 	log.Info().Str("client_id", c.ID).Msg("Client created")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(c)
 }
 
-func (h *Handler) listClient(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) listClients(w http.ResponseWriter, r *http.Request) {
 	clients, err := h.Store.List()
-	if err == nil {
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	json.NewEncoder(w).Encode(clients)
 }
@@ -84,7 +86,7 @@ func (h *Handler) listClient(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getClient(w http.ResponseWriter, r *http.Request, id string) {
 	c, err := h.Store.Get(id)
 	if err != nil {
-		http.Error(w, "client not found", http.StatusBadRequest)
+		http.Error(w, "client not found", http.StatusNotFound)
 		return
 	}
 	json.NewEncoder(w).Encode(c)
