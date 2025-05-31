@@ -1,6 +1,8 @@
 package client
 
 import (
+	"encoding/json"
+	"github.com/rs/zerolog/log"
 	"net/http"
 	"strings"
 )
@@ -46,4 +48,27 @@ func (h *Handler) handleClientByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
+	var c Client
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if c.ID == "" {
+		http.Error(w, "client_id is required", http.StatusBadRequest)
+		return
+	}
+
+	if c.APIKey == "" {
+		c.APIKey = GenerateAPIKey()
+	}
+
+	if err := h.Store.Create(&c); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+	}
+	log.Info().Str("client_id", c.ID).Msg("Client created")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(c)
 }
