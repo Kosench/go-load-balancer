@@ -90,7 +90,7 @@ func (h *Handler) getClient(w http.ResponseWriter, r *http.Request, id string) {
 	json.NewEncoder(w).Encode(c)
 }
 
-func (h *Handler) updateClient(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) updateClient(w http.ResponseWriter, r *http.Request, id string) {
 	var c Client
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
