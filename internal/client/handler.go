@@ -15,7 +15,7 @@ func NewHandler(store ClientStore) *Handler {
 	return &Handler{Store: store}
 }
 
-func (h *Handler) RegisterRouter(mux *http.ServeMux) {
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/clients", h.handleClients)
 	mux.HandleFunc("/clients/", h.handleClientByID)
 }

@@ -46,7 +46,9 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	clientStore := client.NewInMemoryClientStore()
 	clientHandler := client.NewHandler(clientStore)
 	clientMux := http.NewServeMux()
-	clientHandler.RegisterRouter(clientMux)
+	clientHandler.RegisterRoutes(clientMux)
+
+	limiterManager := NewLimiterManager(clientStore)
 
 	server := &Server{
 		Config:   cfg,
@@ -59,6 +61,8 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 		clientHandler: clientHandler,
 	}
 
+	proxyHandler := limiterManager.Middleware(http.HandlerFunc(server.handleRequest))
+
 	server.srv = &http.Server{
 		Addr: cfg.ListenAddress,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +70,7 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 				clientMux.ServeHTTP(w, r)
 				return
 			}
-			server.handleRequest(w, r)
+			proxyHandler.ServeHTTP(w, r)
 		}),
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
