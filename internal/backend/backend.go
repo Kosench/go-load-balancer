@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,7 +31,6 @@ func (b *Backend) SetAlive(state bool) {
 
 func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup) {
 	for _, b := range backends {
-		b.SetAlive(true)
 		wg.Add(1)
 		go func(b *Backend) {
 			defer wg.Done()
@@ -42,21 +42,41 @@ func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup) 
 				w.WriteHeader(http.StatusOK)
 			})
 
+			var listener net.Listener
+			var err error
+			addr := b.Addr
+			if addr == "" || addr == ":0" {
+				listener, err = net.Listen("tcp", ":0")
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to listen on a random port")
+					b.SetAlive(false)
+					return
+				}
+				b.Addr = listener.Addr().String()
+			} else {
+				listener, err = net.Listen("tcp", addr)
+				if err != nil {
+					log.Error().Err(err).Str("address", addr).Msg("Failed to listen")
+					b.SetAlive(false)
+					return
+				}
+			}
+
 			srv := &http.Server{
-				Addr:    b.Addr,
 				Handler: mux,
 			}
 
 			serverDone := make(chan struct{})
+			defer close(serverDone)
+
+			// Set alive only after successful listen
+			b.SetAlive(true)
+			log.Info().Str("address", b.Addr).Msg("Starting backend server")
+
 			go func() {
-				log.Info().Str("address", b.Addr).Msg("Starting backend server")
-				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					log.Error().
-						Err(err).
-						Str("address", b.Addr).
-						Msg("Failed to start backend server")
+				if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+					log.Error().Err(err).Str("address", b.Addr).Msg("Failed to start backend server")
 				}
-				close(serverDone)
 			}()
 
 			select {
@@ -65,15 +85,9 @@ func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup) 
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if err := srv.Shutdown(shutdownCtx); err != nil {
-					log.Error().
-						Err(err).
-						Str("address", b.Addr).
-						Msg("Backend server shutdown failed")
+					log.Error().Err(err).Str("address", b.Addr).Msg("Backend server shutdown failed")
 				}
 				log.Info().Str("address", b.Addr).Msg("Backend server stopped")
-				<-serverDone // Ждем завершения ListenAndServe
-			case <-serverDone:
-				// Сервер сам завершился
 			}
 		}(b)
 	}

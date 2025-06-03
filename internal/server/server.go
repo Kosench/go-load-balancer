@@ -6,8 +6,6 @@ import (
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/client"
 	"load-balancer/internal/config"
-	"load-balancer/internal/ratelimit"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -19,7 +17,6 @@ import (
 type Server struct {
 	Config        *config.Config
 	Balancer      *balancer.Balancer
-	RateLimiter   ratelimit.RateLimiter
 	srv           *http.Server
 	proxies       map[string]*httputil.ReverseProxy
 	proxiesMu     sync.RWMutex
@@ -35,7 +32,6 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 			continue
 		}
 		proxy := httputil.NewSingleHostReverseProxy(url)
-		// Настройка таймаутов для прокси
 		proxy.Transport = &http.Transport{
 			ResponseHeaderTimeout: 10 * time.Second,
 			IdleConnTimeout:       30 * time.Second,
@@ -51,12 +47,8 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	limiterManager := NewLimiterManager(clientStore)
 
 	server := &Server{
-		Config:   cfg,
-		Balancer: lb,
-		RateLimiter: ratelimit.NewTokenBucketRateLimiter(ratelimit.RateLimiterConfig{
-			Capacity:   cfg.RateLimitCapacity,
-			RefillRate: cfg.RateLimitRefillRate,
-		}),
+		Config:        cfg,
+		Balancer:      lb,
 		proxies:       proxies,
 		clientHandler: clientHandler,
 	}
@@ -91,22 +83,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		log.Error().Err(err).Str("remote_addr", r.RemoteAddr).Msg("Failed to parse client IP")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	clientID := host // Используем только IP как идентификатор клиента
-
-	if !s.RateLimiter.Allow(clientID) {
-		log.Error().
-			Str("client", clientID).
-			Msg("Request rate limited")
-		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-		return
-	}
-
 	log.Debug().
 		Str("method", r.Method).
 		Stringer("url", r.URL).
