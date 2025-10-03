@@ -24,32 +24,17 @@ type Server struct {
 }
 
 func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
-	proxies := make(map[string]*httputil.ReverseProxy)
-	for _, backend := range lb.GetBackends() {
-		url, err := url.Parse("http://" + backend.Addr)
-		if err != nil {
-			log.Error().Err(err).Str("backend", backend.Addr).Msg("Failed to parse backend URL")
-			continue
-		}
-		proxy := httputil.NewSingleHostReverseProxy(url)
-		proxy.Transport = &http.Transport{
-			ResponseHeaderTimeout: 10 * time.Second,
-			IdleConnTimeout:       30 * time.Second,
-		}
-		proxies[backend.Addr] = proxy
-	}
-
 	clientStore := client.NewInMemoryClientStore()
 	clientHandler := client.NewHandler(clientStore)
 	clientMux := http.NewServeMux()
 	clientHandler.RegisterRoutes(clientMux)
 
-	limiterManager := NewLimiterManager(clientStore)
+	limiterManager := NewLimiterManager(clientStore, cfg)
 
 	server := &Server{
 		Config:        cfg,
 		Balancer:      lb,
-		proxies:       proxies,
+		proxies:       make(map[string]*httputil.ReverseProxy),
 		clientHandler: clientHandler,
 	}
 
@@ -95,10 +80,10 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	proxy, exists := s.proxies[upstream]
-	if !exists {
-		log.Error().Str("backend", upstream).Msg("No proxy found for backend")
-		http.Error(w, "No proxy found for backend", http.StatusInternalServerError)
+	proxy := s.getOrCreateProxy(upstream)
+	if proxy == nil {
+		log.Error().Str("backend", upstream).Msg("Failed to create proxy for backend")
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -108,4 +93,49 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		Msg("Proxying request to backend")
 
 	proxy.ServeHTTP(w, r)
+}
+
+func (s *Server) getOrCreateProxy(backend string) *httputil.ReverseProxy {
+	s.proxiesMu.RLock()
+	proxy, exists := s.proxies[backend]
+	s.proxiesMu.RUnlock()
+
+	if exists {
+		return proxy
+	}
+
+	s.proxiesMu.Lock()
+	defer s.proxiesMu.Unlock()
+
+	// Double-check in case another goroutine created it
+	if proxy, exists := s.proxies[backend]; exists {
+		return proxy
+	}
+
+	targetURL, err := url.Parse("http://" + backend)
+	if err != nil {
+		log.Error().Err(err).Str("backend", backend).Msg("Failed to parse backend URL")
+		return nil
+	}
+
+	proxy = httputil.NewSingleHostReverseProxy(targetURL)
+	proxy.Transport = &http.Transport{
+		ResponseHeaderTimeout: 10 * time.Second,
+		IdleConnTimeout:       30 * time.Second,
+	}
+
+	// Add error handler
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		log.Error().
+			Err(err).
+			Str("backend", backend).
+			Str("path", r.URL.Path).
+			Msg("Proxy error")
+		http.Error(w, "Bad Gateway", http.StatusBadGateway)
+	}
+
+	s.proxies[backend] = proxy
+	log.Info().Str("backend", backend).Msg("Created new proxy for backend")
+
+	return proxy
 }

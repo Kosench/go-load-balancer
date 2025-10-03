@@ -1,16 +1,19 @@
 package server
 
 import (
+	"errors"
 	"load-balancer/internal/client"
+	"load-balancer/internal/config"
 	"net/http"
 	"sync"
 	"time"
 )
 
 type LimiterManager struct {
-	clientStore client.ClientStore
-	limiters    map[string]*ClientLimiter
-	mu          sync.Mutex
+	clientStore    client.ClientStore
+	limiters       map[string]*ClientLimiter
+	mu             sync.Mutex
+	defaultConfig  *config.Config
 }
 
 type ClientLimiter struct {
@@ -21,10 +24,11 @@ type ClientLimiter struct {
 	lastRefill time.Time
 }
 
-func NewLimiterManager(store client.ClientStore) *LimiterManager {
+func NewLimiterManager(store client.ClientStore, cfg *config.Config) *LimiterManager {
 	return &LimiterManager{
-		clientStore: store,
-		limiters:    make(map[string]*ClientLimiter),
+		clientStore:   store,
+		limiters:      make(map[string]*ClientLimiter),
+		defaultConfig: cfg,
 	}
 }
 
@@ -40,23 +44,24 @@ func newClientLimiter(capacity int, ratePerSec int) *ClientLimiter {
 func (m *LimiterManager) GetLimiter(apiKey string) (*ClientLimiter, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
 	limiter, ok := m.limiters[apiKey]
 	if ok {
 		return limiter, nil
 	}
 
-	clients, err := m.clientStore.List()
+	// Use GetByAPIKey instead of iterating through List()
+	c, err := m.clientStore.GetByAPIKey(apiKey)
 	if err != nil {
+		if errors.Is(err, client.ErrClientNotFound) {
+			return nil, client.ErrClientNotFound
+		}
 		return nil, err
 	}
-	for _, c := range clients {
-		if c.APIKey == apiKey {
-			limiter = newClientLimiter(c.Capacity, c.RatePerSec)
-			m.limiters[apiKey] = limiter
-			return limiter, nil
-		}
-	}
-	return nil, http.ErrNoCookie
+
+	limiter = newClientLimiter(c.Capacity, c.RatePerSec)
+	m.limiters[apiKey] = limiter
+	return limiter, nil
 }
 
 func (m *LimiterManager) Middleware(next http.Handler) http.Handler {
@@ -68,7 +73,11 @@ func (m *LimiterManager) Middleware(next http.Handler) http.Handler {
 		}
 		limiter, err := m.GetLimiter(apiKey)
 		if err != nil {
-			http.Error(w, "Invalid API key", http.StatusForbidden)
+			if errors.Is(err, client.ErrClientNotFound) {
+				http.Error(w, "Invalid API key", http.StatusForbidden)
+			} else {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
 			return
 		}
 		if !limiter.Allow() {

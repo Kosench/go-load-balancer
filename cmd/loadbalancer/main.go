@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/rs/zerolog/log"
 	"load-balancer/internal/backend"
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/config"
@@ -14,6 +13,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -34,12 +35,16 @@ func main() {
 	defer cancel()
 
 	var wg sync.WaitGroup
-	backend.StartBackend(ctx, backends, &wg)
+	backendsReady := make(chan struct{})
+	backend.StartBackend(ctx, backends, &wg, backendsReady)
+
+	// Wait for all backends to be ready
+	<-backendsReady
+	log.Info().Msg("All backends are ready")
 
 	strategy := balancer.NewRoundRobinStrategy(backends)
 	lb := balancer.NewBalancer(strategy, backends)
 
-	time.Sleep(2 * time.Second)
 	health.StartHealthCheck(ctx, backends, 15*time.Second)
 
 	srv := server.NewServer(cfg, lb)

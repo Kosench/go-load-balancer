@@ -29,7 +29,11 @@ func (b *Backend) SetAlive(state bool) {
 	atomic.StoreInt32(&b.Alive, value)
 }
 
-func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup) {
+func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup, ready chan<- struct{}) {
+	readyCount := 0
+	readyMu := sync.Mutex{}
+	totalBackends := len(backends)
+
 	for _, b := range backends {
 		wg.Add(1)
 		go func(b *Backend) {
@@ -72,6 +76,14 @@ func StartBackend(ctx context.Context, backends []*Backend, wg *sync.WaitGroup) 
 			// Set alive only after successful listen
 			b.SetAlive(true)
 			log.Info().Str("address", b.Addr).Msg("Starting backend server")
+
+			// Notify that this backend is ready
+			readyMu.Lock()
+			readyCount++
+			if readyCount == totalBackends && ready != nil {
+				close(ready)
+			}
+			readyMu.Unlock()
 
 			go func() {
 				if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {

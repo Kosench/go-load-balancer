@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestBackend_IsAlive(t *testing.T) {
@@ -25,10 +24,11 @@ func TestStartBackend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	backend := &Backend{Addr: ":0"} // listen on random available port
-	StartBackend(ctx, []*Backend{backend}, &wg)
+	ready := make(chan struct{})
+	StartBackend(ctx, []*Backend{backend}, &wg, ready)
 
-	// Allow time for the server to start and Addr to be filled
-	time.Sleep(200 * time.Millisecond)
+	// Wait for backend to be ready
+	<-ready
 
 	// Check if the server responds
 	resp, err := http.Get("http://" + backend.Addr + "/")
