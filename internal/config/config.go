@@ -1,3 +1,4 @@
+// Package config handles application configuration loading and validation.
 package config
 
 import (
@@ -7,13 +8,17 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config holds the application configuration loaded from environment or config file.
 type Config struct {
-	ListenAddress       string   `mapstructure:"LISTEN_ADDRESS"`
-	Backends            []string `mapstructure:"BACKENDS"`
-	RateLimitCapacity   float64  `mapstructure:"RATE_LIMIT_CAPACITY"`
-	RateLimitRefillRate float64  `mapstructure:"RATE_LIMIT_REFILL_RATE"`
+	ListenAddress       string   `mapstructure:"LISTEN_ADDRESS"`         // Address to listen on (host:port)
+	Backends            []string `mapstructure:"BACKENDS"`               // List of backend server addresses
+	RateLimitCapacity   float64  `mapstructure:"RATE_LIMIT_CAPACITY"`    // Default rate limit bucket capacity
+	RateLimitRefillRate float64  `mapstructure:"RATE_LIMIT_REFILL_RATE"` // Default rate limit refill rate
 }
 
+// LoadConfig loads configuration from the specified path.
+// It looks for an app.env file and falls back to defaults if not found.
+// Environment variables take precedence over file values.
 func LoadConfig(path string) (*Config, error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName("app")
@@ -49,6 +54,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// Validate checks that the configuration is valid and all required fields are set.
 func (c *Config) Validate() error {
 	if c.ListenAddress == "" {
 		return errors.New("listen address cannot be empty")

@@ -1,21 +1,29 @@
 package balancer
 
 import (
-	"github.com/rs/zerolog/log"
 	"load-balancer/internal/backend"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
+// Strategy defines the interface for load balancing strategies.
+// Implementations must be thread-safe.
 type Strategy interface {
+	// GetNext returns the address of the next backend to use.
+	// Returns empty string if no backends are available.
 	GetNext() string
 }
 
+// RoundRobinStrategy implements a round-robin load balancing strategy.
+// It distributes requests evenly across all healthy backends in a circular manner.
 type RoundRobinStrategy struct {
 	backends []*backend.Backend
 	index    int
 	mutex    sync.Mutex
 }
 
+// NewRoundRobinStrategy creates a new round-robin strategy for the given backends.
 func NewRoundRobinStrategy(backends []*backend.Backend) *RoundRobinStrategy {
 	return &RoundRobinStrategy{
 		backends: backends,

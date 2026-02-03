@@ -1,3 +1,6 @@
+// Package main provides the entry point for the load balancer application.
+// It initializes and coordinates the load balancer, backend servers, health checks,
+// and HTTP server with rate limiting middleware.
 package main
 
 import (
@@ -22,7 +25,12 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load config")
 	}
-	log.Print(cfg)
+	log.Info().
+		Str("listen_address", cfg.ListenAddress).
+		Strs("backends", cfg.Backends).
+		Float64("rate_limit_capacity", cfg.RateLimitCapacity).
+		Float64("rate_limit_refill_rate", cfg.RateLimitRefillRate).
+		Msg("Loaded configuration")
 
 	var backends []*backend.Backend
 	for _, addr := range cfg.Backends {

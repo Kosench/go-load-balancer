@@ -8,26 +8,34 @@ import (
 )
 
 var (
+	// ErrClientAlreadyExists is returned when attempting to create a client with an ID or API key that already exists.
 	ErrClientAlreadyExists = errors.New("client already exists")
-	ErrClientNotFound      = errors.New("client not found")
-	ErrInvalidClient       = errors.New("invalid client")
+	// ErrClientNotFound is returned when a requested client cannot be found.
+	ErrClientNotFound = errors.New("client not found")
+	// ErrInvalidClient is returned when client validation fails.
+	ErrInvalidClient = errors.New("invalid client")
 )
 
+// ClientStore defines the interface for client data persistence and retrieval.
+// Implementations must be thread-safe.
 type ClientStore interface {
-	Create(client *Client) error
-	Get(clientID string) (*Client, error)
-	GetByAPIKey(apiKey string) (*Client, error)
-	Update(client *Client) error
-	Delete(clientID string) error
-	List() ([]*Client, error)
+	Create(client *Client) error                // Create a new client
+	Get(clientID string) (*Client, error)       // Get client by ID
+	GetByAPIKey(apiKey string) (*Client, error) // Get client by API key
+	Update(client *Client) error                // Update existing client
+	Delete(clientID string) error               // Delete client by ID
+	List() ([]*Client, error)                   // List all clients
 }
 
+// InMemoryClientStore is a thread-safe in-memory implementation of ClientStore.
+// It maintains indexes by both client ID and API key for efficient lookups.
 type InMemoryClientStore struct {
-	mu           sync.RWMutex
-	clients      map[string]*Client
-	apiKeyIndex  map[string]*Client
+	mu          sync.RWMutex
+	clients     map[string]*Client // Index by client ID
+	apiKeyIndex map[string]*Client // Index by API key
 }
 
+// NewInMemoryClientStore creates a new in-memory client store.
 func NewInMemoryClientStore() *InMemoryClientStore {
 	return &InMemoryClientStore{
 		clients:     make(map[string]*Client),

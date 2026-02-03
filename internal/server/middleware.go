@@ -9,21 +9,26 @@ import (
 	"time"
 )
 
+// LimiterManager manages rate limiters for all clients.
+// It creates and caches limiters based on API keys.
 type LimiterManager struct {
-	clientStore    client.ClientStore
-	limiters       map[string]*ClientLimiter
-	mu             sync.Mutex
-	defaultConfig  *config.Config
+	clientStore   client.ClientStore
+	limiters      map[string]*ClientLimiter // Cached limiters by API key
+	mu            sync.Mutex
+	defaultConfig *config.Config
 }
 
+// ClientLimiter implements a token bucket rate limiter for a single client.
+// It uses a mutex for thread-safe access.
 type ClientLimiter struct {
 	mu         sync.Mutex
-	capacity   int
-	tokens     int
-	ratePerSec int
-	lastRefill time.Time
+	capacity   int       // Maximum tokens (burst capacity)
+	tokens     int       // Current available tokens
+	ratePerSec int       // Tokens added per second
+	lastRefill time.Time // Last time tokens were refilled
 }
 
+// NewLimiterManager creates a new rate limiter manager.
 func NewLimiterManager(store client.ClientStore, cfg *config.Config) *LimiterManager {
 	return &LimiterManager{
 		clientStore:   store,
@@ -64,6 +69,7 @@ func (m *LimiterManager) GetLimiter(apiKey string) (*ClientLimiter, error) {
 	return limiter, nil
 }
 
+// Middleware returns an HTTP middleware that enforces rate limiting based on API keys.
 func (m *LimiterManager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		apiKey := r.Header.Get("X-API-Key")
@@ -88,6 +94,8 @@ func (m *LimiterManager) Middleware(next http.Handler) http.Handler {
 	})
 }
 
+// Allow checks if a request should be allowed based on the token bucket algorithm.
+// Returns true if allowed, false if rate limit exceeded.
 func (l *ClientLimiter) Allow() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()

@@ -1,13 +1,17 @@
+// Package health provides health check functionality for backend servers.
 package health
 
 import (
 	"context"
-	"github.com/rs/zerolog/log"
 	"load-balancer/internal/backend"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
+// StartHealthCheck starts periodic health checks for all backends.
+// It runs in a goroutine and stops when the context is cancelled.
 func StartHealthCheck(ctx context.Context, backends []*backend.Backend, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 

@@ -1,8 +1,8 @@
+// Package server provides HTTP server implementation with reverse proxy and rate limiting.
 package server
 
 import (
 	"context"
-	"github.com/rs/zerolog/log"
 	"load-balancer/internal/balancer"
 	"load-balancer/internal/client"
 	"load-balancer/internal/config"
@@ -12,17 +12,22 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
+// Server represents the HTTP load balancer server.
+// It handles incoming requests, applies rate limiting, and proxies to backends.
 type Server struct {
 	Config        *config.Config
 	Balancer      *balancer.Balancer
 	srv           *http.Server
-	proxies       map[string]*httputil.ReverseProxy
+	proxies       map[string]*httputil.ReverseProxy // Cached reverse proxies per backend
 	proxiesMu     sync.RWMutex
 	clientHandler *client.Handler
 }
 
+// NewServer creates a new load balancer server with the given configuration and balancer.
 func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	clientStore := client.NewInMemoryClientStore()
 	clientHandler := client.NewHandler(clientStore)
@@ -57,11 +62,13 @@ func NewServer(cfg *config.Config, lb *balancer.Balancer) *Server {
 	return server
 }
 
+// Start starts the HTTP server and begins accepting requests.
 func (s *Server) Start() error {
 	log.Info().Msgf("Starting server on %s", s.Config.ListenAddress)
 	return s.srv.ListenAndServe()
 }
 
+// Shutdown gracefully shuts down the server within the given context timeout.
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Info().Msg("Shutting down server")
 	return s.srv.Shutdown(ctx)

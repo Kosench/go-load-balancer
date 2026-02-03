@@ -2,19 +2,23 @@ package client
 
 import (
 	"encoding/json"
-	"github.com/rs/zerolog/log"
 	"net/http"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
+// Handler manages HTTP endpoints for client CRUD operations.
 type Handler struct {
-	Store ClientStore
+	Store ClientStore // Client storage backend
 }
 
+// NewHandler creates a new client management handler.
 func NewHandler(store ClientStore) *Handler {
 	return &Handler{Store: store}
 }
 
+// RegisterRoutes registers client management routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/clients", h.handleClients)
 	mux.HandleFunc("/clients/", h.handleClientByID)
@@ -62,7 +66,12 @@ func (h *Handler) createClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if c.APIKey == "" {
-		c.APIKey = GenerateAPIKey()
+		var err error
+		c.APIKey, err = GenerateAPIKey()
+		if err != nil {
+			http.Error(w, "Failed to generate API key", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if err := h.Store.Create(&c); err != nil {
